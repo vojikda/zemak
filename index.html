@@ -1,0 +1,652 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#e05a24">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);box-sizing:border-box}*,*::before,*::after{box-sizing:inherit}body{margin:0}[hidden]{display:none!important}</style>
+<title>Slepá mapa Evropy</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Lexend:wght@400;500;600&display=swap">
+<style>
+/* Layout: one-screen atlas app — map fills the screen, task panel docked below (phone) or right (desktop); home menu slides over the map */
+:root{
+  --bg:#eef2ee; --card:#fbfcf9; --ink:#1c2a31; --muted:#5b6b70; --line:#d5ddd6;
+  --sea:#cfe2e8; --grat:#a9c6d0; --land:#f2ecd5; --border:#b3a98d;
+  --accent:#e05a24; --accent-ink:#ffffff; --ok:#258a50; --bad:#c9353a; --near:#c98a12;
+  --range:#9a5a2a; --low:#5e9e4c; --pen:#cf9a33; --isl:#3f84a6;
+  --display:"Bricolage Grotesque", "Trebuchet MS", system-ui, sans-serif;
+  --body:"Lexend", "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#10171b; --card:#172126; --ink:#e7ede9; --muted:#9aaab0; --line:#2a383e;
+  --sea:#14303b; --grat:#24485a; --land:#2d3428; --border:#5b6553;
+  --accent:#ff7f45; --accent-ink:#1a0d06; --ok:#45c47c; --bad:#ff6a6e; --near:#f2b544;
+  --range:#d08a52; --low:#7fc56a; --pen:#e7b75a; --isl:#6cb7da; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#10171b; --card:#172126; --ink:#e7ede9; --muted:#9aaab0; --line:#2a383e;
+  --sea:#14303b; --grat:#24485a; --land:#2d3428; --border:#5b6553;
+  --accent:#ff7f45; --accent-ink:#1a0d06; --ok:#45c47c; --bad:#ff6a6e; --near:#f2b544;
+  --range:#d08a52; --low:#7fc56a; --pen:#e7b75a; --isl:#6cb7da; color-scheme:dark}
+
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;overflow:hidden;-webkit-tap-highlight-color:transparent}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+#app{height:100%;display:grid;grid-template-rows:auto minmax(0,1fr) auto;grid-template-columns:minmax(0,1fr)}
+.bar{display:flex;align-items:center;gap:10px;padding-block:8px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));border-bottom:1px solid var(--line);background:var(--card);grid-column:1/-1}
+.brand{font-family:var(--display);font-weight:800;font-size:19px;letter-spacing:-.01em;margin-right:auto;white-space:nowrap;background:none;border:0;padding:0}
+.brand span{color:var(--accent)}
+.stat{display:flex;flex-direction:column;align-items:flex-end;line-height:1.05}
+.stat b{font-family:var(--display);font-size:19px;font-variant-numeric:tabular-nums}
+.stat small{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.stat.hot b{color:var(--accent)}
+.iconbtn{width:40px;height:40px;border-radius:12px;border:1px solid var(--line);background:var(--bg);display:grid;place-items:center;flex:none}
+.iconbtn svg{width:20px;height:20px}
+
+#mapwrap{position:relative;min-height:0;background:var(--sea);overflow:hidden}
+#map{width:100%;height:100%;display:block;touch-action:none;user-select:none;-webkit-user-select:none}
+.grat{fill:none;stroke:var(--grat);stroke-width:.7;vector-effect:non-scaling-stroke}
+.country{fill:var(--land);stroke:var(--border);stroke-width:.6;vector-effect:non-scaling-stroke;stroke-linejoin:round}
+.f-line{fill:none;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke;stroke-width:9px;stroke:var(--accent);opacity:.9}
+.f-area{stroke:none;fill:var(--accent);opacity:.5}
+.f-land{fill:var(--accent);opacity:.75;stroke:var(--accent);stroke-width:1.5;vector-effect:non-scaling-stroke}
+.ok .f-line,.f-line.ok{stroke:var(--ok)} .f-area.ok,.f-land.ok{fill:var(--ok);stroke:var(--ok)}
+.f-line.bad{stroke:var(--bad)} .f-area.bad,.f-land.bad{fill:var(--bad);stroke:var(--bad)}
+.f-line.learn{stroke:var(--range);opacity:.75;stroke-width:6px}
+.f-area.learn.low{fill:var(--low);opacity:.4} .f-area.learn.pen{fill:var(--pen);opacity:.45}
+.f-land.learn{fill:var(--isl);stroke:var(--isl);opacity:.55}
+.f-sel{opacity:1!important}
+.f-line.f-sel{stroke:var(--accent)!important;stroke-width:10px} .f-area.f-sel,.f-land.f-sel{fill:var(--accent)!important;opacity:.7!important}
+.pt-dot{stroke:var(--card);stroke-width:2.5}
+.pt-ring{fill:none;stroke-width:3;transform-box:fill-box;transform-origin:center;animation:pulse 1.6s ease-out infinite}
+@keyframes pulse{0%{transform:scale(.5);opacity:1}100%{transform:scale(2.4);opacity:0}}
+.lbl{font-family:var(--body);font-weight:600;font-size:11.5px;fill:var(--ink);paint-order:stroke;stroke:var(--card);stroke-width:3.5px;stroke-linejoin:round;pointer-events:none}
+.lbl.sel{fill:var(--accent);font-size:13px}
+.tap{fill:var(--ink);stroke:var(--card);stroke-width:2}
+.miss-line{stroke:var(--ink);stroke-width:2;stroke-dasharray:5 5;opacity:.7}
+.zoomctl{position:absolute;right:max(12px,env(safe-area-inset-right,0px));bottom:12px;display:flex;flex-direction:column;gap:6px}
+.zoomctl button{width:40px;height:40px;border-radius:12px;border:1px solid var(--line);background:var(--card);font-size:20px;font-weight:600;display:grid;place-items:center;box-shadow:0 2px 6px rgb(0 0 0 / .12)}
+.loading{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:24px;color:var(--muted)}
+
+#panel{height:clamp(208px,36vh,300px);overflow-y:auto;padding-block:14px 18px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));background:var(--card);border-top:1px solid var(--line);display:flex;flex-direction:column;gap:12px}
+@media (min-width:900px){
+  #app{grid-template-columns:minmax(0,1fr) 380px;grid-template-rows:auto minmax(0,1fr)}
+  #panel{height:auto;border-top:0;border-left:1px solid var(--line);padding:22px}
+}
+.eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:600}
+.qline{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.qname{font-family:var(--display);font-weight:800;font-size:clamp(26px,7vw,34px);line-height:1.02;letter-spacing:-.015em;text-wrap:balance}
+.kind{display:inline-block;font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;background:var(--bg);border:1px solid var(--line);color:var(--muted)}
+.hint{color:var(--muted);font-size:13.5px;line-height:1.45}
+.prog{display:flex;gap:4px}
+.prog i{flex:1;height:6px;border-radius:3px;background:var(--line)}
+.prog i.ok{background:var(--ok)} .prog i.near{background:var(--near)} .prog i.bad{background:var(--bad)} .prog i.cur{background:var(--accent)}
+.fb{border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:4px;border:1.5px solid}
+.fb.ok{border-color:var(--ok)} .fb.near{border-color:var(--near)} .fb.bad{border-color:var(--bad)}
+.fb strong{font-family:var(--display);font-size:20px}
+.fb.ok strong{color:var(--ok)} .fb.near strong{color:var(--near)} .fb.bad strong{color:var(--bad)}
+.fb p{margin:0;font-size:13.5px;line-height:1.45;color:var(--muted)}
+.btn{border:0;border-radius:14px;padding:13px 18px;font-weight:600;font-size:16px;background:var(--accent);color:var(--accent-ink)}
+.btn.ghost{background:var(--bg);color:var(--ink);border:1px solid var(--line)}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row .btn{flex:1}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.opt{border:1.5px solid var(--line);background:var(--bg);border-radius:14px;padding:12px 10px;font-weight:600;font-size:15px;text-align:left;min-height:52px;line-height:1.2}
+.opt.ok{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 16%,var(--bg))}
+.opt.bad{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 14%,var(--bg))}
+.opt:disabled{cursor:default}
+.timer{height:8px;border-radius:4px;background:var(--line);overflow:hidden}
+.timer i{display:block;height:100%;background:var(--accent);transform-origin:left;transition:transform .25s linear}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1.5px solid var(--line);background:var(--bg);border-radius:999px;padding:7px 12px;font-size:13.5px;font-weight:500}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--card);border-color:var(--ink)}
+.chip.sel{border-color:var(--accent);color:var(--accent);font-weight:600}
+.stars{color:var(--near);letter-spacing:1px;font-size:14px}
+.stars .off{color:var(--line)}
+.info h3{margin:0;font-family:var(--display);font-size:24px;font-weight:800}
+.info p{margin:6px 0 0;line-height:1.5;font-size:14.5px;max-width:60ch}
+.meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px}
+.num{font-variant-numeric:tabular-nums}
+
+/* home sheet */
+#home{position:fixed;inset:0;z-index:20;background:color-mix(in srgb,var(--bg) 55%,transparent);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);overflow-y:auto;padding-block:calc(env(safe-area-inset-top,0px) + 16px) calc(env(safe-area-inset-bottom,0px) + 16px);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.sheet{max-width:560px;margin:0 auto;background:var(--card);border:1px solid var(--line);border-radius:22px;padding:22px 18px;display:flex;flex-direction:column;gap:18px;box-shadow:0 10px 40px rgb(0 0 0 / .18)}
+.sheet h1{margin:0;font-family:var(--display);font-weight:800;font-size:clamp(32px,9vw,44px);line-height:.95;letter-spacing:-.025em;text-wrap:balance}
+.sheet h1 span{color:var(--accent)}
+.sheet h2{margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}
+.lead{margin:8px 0 0;color:var(--muted);line-height:1.5}
+.modes{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mode{border:1.5px solid var(--line);background:var(--bg);border-radius:18px;padding:14px;text-align:left;display:flex;flex-direction:column;gap:6px;min-height:118px}
+.mode svg{width:30px;height:30px;color:var(--accent)}
+.mode b{font-family:var(--display);font-size:19px;font-weight:800}
+.mode span{font-size:12.5px;color:var(--muted);line-height:1.35}
+.mode small{margin-top:auto;font-size:11.5px;color:var(--muted)}
+.mode:hover{border-color:var(--accent)}
+.bigprog{display:flex;flex-direction:column;gap:6px}
+.bigprog .track{height:12px;border-radius:6px;background:var(--line);overflow:hidden}
+.bigprog .track i{display:block;height:100%;background:linear-gradient(90deg,var(--low),var(--ok))}
+.bigprog div.l{display:flex;justify-content:space-between;font-size:13px;color:var(--muted)}
+.overview{display:grid;grid-template-columns:1fr auto;gap:6px 12px;font-size:14px}
+.overview .cat{grid-column:1/-1;margin-top:10px;font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:600}
+.linkbtn{background:none;border:0;padding:0;color:var(--muted);text-decoration:underline;font-size:13px}
+@media (prefers-reduced-motion:reduce){.pt-ring{animation:none;opacity:.6}.timer i{transition:none}}
+</style>
+
+</head>
+<body>
+<div id="app">
+  <header class="bar">
+    <button class="brand" id="brand" aria-label="Menu">Slepá mapa <span>Evropy</span></button>
+    <div class="stat" id="stScore" hidden><b class="num" id="vScore">0</b><small>body</small></div>
+    <div class="stat hot" id="stStreak" hidden><b class="num" id="vStreak">0</b><small>v řadě</small></div>
+    <button class="iconbtn" id="homeBtn" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+  </header>
+  <main id="mapwrap">
+    <svg id="map" aria-label="Slepá mapa Evropy"></svg>
+    <div class="loading" id="loading">Načítám mapu…</div>
+    <div class="zoomctl">
+      <button id="zIn" aria-label="Přiblížit">+</button>
+      <button id="zOut" aria-label="Oddálit">−</button>
+      <button id="zReset" aria-label="Celá Evropa"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+    </div>
+  </main>
+  <section id="panel" aria-live="polite"></section>
+</div>
+
+<div id="home" role="dialog" aria-label="Menu">
+  <div class="sheet" id="sheet"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/datamaps@0.5.9/dist/datamaps.world.hires.min.js"></script>
+<script>
+"use strict";
+/* ---------- DATA: objekty ze slepé mapy ---------- */
+const CATS=[
+  {id:'pohori',name:'Pohoří'},
+  {id:'vrcholy',name:'Hory a sopky'},
+  {id:'niziny',name:'Nížiny'},
+  {id:'poloostrovy',name:'Poloostrovy'},
+  {id:'ostrovy',name:'Ostrovy'},
+  {id:'mysy',name:'Krajní body'}
+];
+const KIND={range:'pohoří',peak:'hora',volcano:'sopka',cape:'krajní bod',lowland:'nížina',peninsula:'poloostrov',island:'ostrov',islands:'ostrovy'};
+const F=[
+ // pohoří
+ {id:'alpy',name:'Alpy',cat:'pohori',kind:'range',line:[[7.6,44.1],[7.0,44.6],[6.9,45.4],[7.3,45.9],[8.5,46.4],[10.0,46.6],[11.5,46.9],[13.0,47.0],[14.5,47.2],[16.0,47.6]],fact:'Nejvyšší pohoří střední Evropy. Oblouk Alp prochází osmi státy, od Francie až po Rakousko a Slovinsko.'},
+ {id:'pyreneje',name:'Pyreneje',cat:'pohori',kind:'range',line:[[-1.7,43.1],[-0.5,42.85],[0.7,42.65],[1.8,42.5],[3.0,42.45]],fact:'Přirozená hranice mezi Francií a Španělskem. Uprostřed hor leží malý stát Andorra.'},
+ {id:'apeniny',name:'Apeniny',cat:'pohori',kind:'range',line:[[8.6,44.45],[10.2,44.3],[11.6,43.9],[12.8,43.2],[13.5,42.4],[14.4,41.6],[15.3,40.8],[16.1,39.9],[16.3,38.8],[15.9,38.2]],fact:'Páteř Itálie. Táhnou se asi 1 200 km po celé délce Apeninského poloostrova.'},
+ {id:'karpaty',name:'Karpaty',cat:'pohori',kind:'range',line:[[17.3,48.3],[18.3,49.1],[19.8,49.35],[21.5,49.3],[23.0,48.9],[24.4,48.0],[25.4,47.4],[25.9,46.5],[26.2,45.7],[25.3,45.4],[24.0,45.4],[22.6,45.3],[22.2,44.7]],fact:'Velký oblouk dlouhý asi 1 500 km. Začínají u nás: Bílé Karpaty a Beskydy patří k Karpatům.'},
+ {id:'skandinavske',name:'Skandinávské pohoří',cat:'pohori',kind:'range',line:[[6.8,58.9],[7.7,60.3],[8.2,61.6],[10.5,62.6],[12.4,63.6],[14.0,65.2],[15.8,66.8],[17.8,68.2],[20.0,69.2],[23.0,70.0]],fact:'Táhne se podél celého Norska. Ledovce v něm vyhloubily hluboké zátoky – fjordy.'},
+ {id:'balkan',name:'Balkán (Stará planina)',cat:'pohori',kind:'range',line:[[22.4,43.7],[23.5,43.15],[24.8,42.75],[26.0,42.7],[27.2,42.75],[27.9,42.8]],fact:'Pohoří v Bulharsku. Podle něj dostal jméno celý Balkánský poloostrov.'},
+ {id:'dinarske',name:'Dinárské hory',cat:'pohori',kind:'range',line:[[14.4,45.4],[15.3,44.8],[16.3,44.0],[17.6,43.4],[18.8,42.8],[19.8,42.4]],fact:'Vápencové hory podél Jadranu. Je tu krasová krajina s jeskyněmi a propastmi.'},
+ {id:'pindos',name:'Pindos',cat:'pohori',kind:'range',line:[[20.6,40.4],[21.1,39.8],[21.4,39.3],[21.8,38.8]],fact:'Hlavní pohoří pevninského Řecka, táhne se od severu k jihu.'},
+ {id:'ural',name:'Ural',cat:'pohori',kind:'range',line:[[65.5,68.3],[63.0,66.5],[59.8,64.5],[59.3,62.0],[59.2,59.0],[59.5,56.0],[58.8,53.5],[58.5,51.8]],fact:'Hranice mezi Evropou a Asií. Pohoří je dlouhé asi 2 500 km.'},
+ {id:'sierranevada',name:'Sierra Nevada',cat:'pohori',kind:'range',line:[[-3.75,37.05],[-3.35,37.07],[-2.9,37.1],[-2.6,37.15]],fact:'Pohoří na jihu Španělska. Název znamená „zasněžené hory“, sníh tu leží i kousek od moře.'},
+ // hory a sopky
+ {id:'montblanc',name:'Mont Blanc',cat:'vrcholy',kind:'peak',pt:[6.865,45.833],h:'4 806 m',fact:'Nejvyšší hora Alp, na hranici Francie a Itálie. Jméno znamená „Bílá hora“. V učebnicích bývá i 4 810 m.'},
+ {id:'mulhacen',name:'Mulhacén',cat:'vrcholy',kind:'peak',pt:[-3.311,37.053],h:'3 479 m',fact:'Nejvyšší hora Pyrenejského poloostrova. Leží v pohoří Sierra Nevada.'},
+ {id:'mytikas',name:'Olymp (Mytikas)',cat:'vrcholy',kind:'peak',pt:[22.358,40.086],h:'2 917 m',fact:'Podle řeckých bájí sídlo bohů. Mytikas je nejvyšší vrchol Olympu i celého Řecka.'},
+ {id:'hvanna',name:'Hvannadalshnúkur',cat:'vrcholy',kind:'peak',pt:[-16.677,64.014],h:'2 110 m',fact:'Nejvyšší hora Islandu. Leží na okraji obřího ledovce Vatnajökull.'},
+ {id:'etna',name:'Etna',cat:'vrcholy',kind:'volcano',pt:[14.995,37.751],h:'asi 3 300 m',fact:'Nejvyšší činná sopka Evropy (mimo Kavkaz), leží na Sicílii. Výška se mění s erupcemi, v učebnici je 3 323 m.'},
+ {id:'vesuv',name:'Vesuv',cat:'vrcholy',kind:'volcano',pt:[14.426,40.821],h:'1 281 m',fact:'Sopka u Neapole. Roku 79 n. l. zasypala popelem římské město Pompeje.'},
+ {id:'hekla',name:'Hekla',cat:'vrcholy',kind:'volcano',pt:[-19.70,63.98],h:'1 491 m',fact:'Jedna z nejčinnějších sopek Islandu. Ve středověku se o ní říkalo, že je to brána do pekla.'},
+ // nížiny
+ {id:'vychodoevropska',name:'Východoevropská rovina',cat:'niziny',kind:'lowland',lab:[40,56],area:[[24.5,53],[27,55],[30,59],[32,62],[35,64],[42,66],[50,67],[58,66.5],[58.5,62],[58,57],[56,53],[52,50.5],[47,48.5],[41,47.3],[36,47],[32,46.7],[30,47],[27,48.3],[25,50.5]],fact:'Největší rovina Evropy. Většina leží v Rusku, sahá až k Uralu.'},
+ {id:'severonemecka',name:'Severoněmecká nížina',cat:'niziny',kind:'lowland',lab:[10.5,52.8],area:[[6.2,52.2],[6.8,53.4],[8.5,53.6],[9.8,54.0],[11.3,54.1],[13.0,54.3],[14.2,53.9],[14.6,52.6],[14.7,51.4],[12.5,51.3],[10.5,51.9],[8.5,52.0],[7.0,51.6]],fact:'Rovina na severu Německa. Protéká jí i naše Labe na cestě do Severního moře.'},
+ {id:'stredopolska',name:'Středopolská nížina',cat:'niziny',kind:'lowland',lab:[19.3,52.2],area:[[15.0,52.9],[17.5,53.2],[20.5,53.0],[23.4,52.8],[23.6,51.6],[21.5,51.3],[19.0,51.2],[16.5,51.4],[15.0,51.8]],fact:'Srdce Polska. Protéká jí řeka Visla a leží tu Varšava.'},
+ {id:'baltska',name:'Baltská nížina',cat:'niziny',kind:'lowland',lab:[24.8,57],area:[[21.1,55.3],[21.0,56.8],[21.8,57.6],[23.5,59.3],[27.9,59.4],[27.5,57.5],[28.1,56.0],[26.6,55.6],[25.5,54.3],[23.5,54.2],[22.8,54.9]],fact:'Rovinatá krajina pobaltských států: Estonska, Lotyšska a Litvy.'},
+ {id:'rumunska',name:'Rumunská nížina',cat:'niziny',kind:'lowland',lab:[25.6,44.4],area:[[22.4,44.5],[23.5,44.1],[25.0,43.7],[26.5,43.8],[27.6,44.1],[28.0,44.6],[27.8,45.3],[27.0,45.5],[26.0,45.2],[24.5,44.95],[23.2,44.9]],fact:'Úrodná rovina podél Dunaje mezi Karpaty a Bulharskem. Leží tu Bukurešť.'},
+ // poloostrovy
+ {id:'skandinavsky',name:'Skandinávský poloostrov',cat:'poloostrovy',kind:'peninsula',lab:[15,64],area:[[3,62],[4.5,58.8],[7,57.8],[10.6,58.7],[11.4,57.8],[12.9,56.1],[12.8,55.3],[14.5,55.2],[16.6,56.1],[19.5,57.5],[19.3,60.2],[20.6,63.6],[24.1,65.8],[28.8,68.9],[31.5,69.8],[31.5,71.5],[25,72],[15,70.5]],fact:'Největší poloostrov Evropy. Leží na něm Norsko a Švédsko.'},
+ {id:'kola',name:'Poloostrov Kola',cat:'poloostrovy',kind:'peninsula',lab:[36,67.8],area:[[32.4,66.9],[30.8,67.8],[29.8,69.1],[30.5,70.0],[37,69.6],[41.6,68.4],[41.6,66.0],[38,66.0],[35,66.4],[33.6,66.6]],fact:'Ruský poloostrov za polárním kruhem. Leží na něm přístav Murmansk.'},
+ {id:'jutsky',name:'Jutský poloostrov',cat:'poloostrovy',kind:'peninsula',lab:[9.2,56.1],area:[[7.8,57.0],[8.2,57.6],[10.6,57.95],[10.75,57.3],[10.4,56.5],[10.9,56.4],[9.75,55.55],[9.6,55.1],[10.2,54.6],[11.1,54.4],[10.9,53.95],[9.8,53.6],[8.8,53.85],[8.0,54.4],[8.0,55.5],[8.0,56.6]],fact:'Pevninská část Dánska. Jižní kousek poloostrova patří Německu.'},
+ {id:'pyrenejsky',name:'Pyrenejský poloostrov',cat:'poloostrovy',kind:'peninsula',lab:[-4,40],area:[[-10,44],[-1.8,43.4],[-1.4,43.1],[0,42.7],[1.7,42.5],[3.2,42.45],[3.6,42.2],[3.6,41.5],[1,40.5],[0.5,38.6],[-1.5,37],[-2.2,36.6],[-5.3,36.0],[-5.65,35.95],[-7,36.6],[-9,36.9],[-9.9,38.5]],fact:'Leží na něm Španělsko a Portugalsko. Od Afriky ho dělí jen 14 km široký Gibraltarský průliv.'},
+ {id:'apeninsky',name:'Apeninský poloostrov',cat:'poloostrovy',kind:'peninsula',lab:[14.6,41.9],area:[[8.0,44.2],[9.5,44.6],[12.4,44.6],[13.5,43.6],[16,42],[18.8,40.4],[18.6,39.7],[17,38.8],[16.5,37.8],[15.68,37.9],[15.68,38.3],[15.2,39.5],[12.5,41.2],[11.0,42.2],[10.1,43.2],[9.5,44.0]],fact:'Poloostrov ve tvaru boty. Leží na něm Itálie a malé státy San Marino a Vatikán.'},
+ {id:'balkansky',name:'Balkánský poloostrov',cat:'poloostrovy',kind:'peninsula',lab:[21.5,42],area:[[13.6,45.8],[15.5,46.0],[19,45.2],[22.5,44.6],[25,43.7],[28,43.9],[29.7,45.2],[30.5,44.5],[29.5,41.5],[28.5,41.1],[26.6,40.2],[26,39.8],[24,37.6],[23.3,36.2],[22.4,36.2],[21.5,36.6],[19.8,38.2],[19.2,40.2],[18.4,42.2],[16,43.4],[14,44.6],[13.4,45.5]],fact:'Hornatý poloostrov na jihovýchodě Evropy. Patří k němu Řecko, Bulharsko i státy bývalé Jugoslávie.'},
+ // ostrovy
+ {id:'island',name:'Island',cat:'ostrovy',kind:'island',iso:['ISL'],pt:[-18.6,64.9],fact:'Ostrov ohně a ledu: sopky, gejzíry i ledovce. Leží na Středoatlantském hřbetu.'},
+ {id:'britske',name:'Britské ostrovy',cat:'ostrovy',kind:'islands',iso:['GBR','IRL'],pt:[-3.5,54],fact:'Dva největší ostrovy jsou Velká Británie a Irsko.'},
+ {id:'baleary',name:'Baleáry',cat:'ostrovy',kind:'islands',part:['ESP',[1,38.5,4.6,40.2]],pt:[2.9,39.6],fact:'Španělské ostrovy ve Středozemním moři. Největší jsou Mallorca, Menorca a Ibiza.'},
+ {id:'korsika',name:'Korsika',cat:'ostrovy',kind:'island',part:['FRA',[8.4,41.3,9.7,43.1]],pt:[9.1,42.1],fact:'Hornatý francouzský ostrov. Narodil se tu Napoleon Bonaparte.'},
+ {id:'sardinie',name:'Sardinie',cat:'ostrovy',kind:'island',part:['ITA',[8,38.8,10,41.4]],pt:[9.0,40.1],fact:'Druhý největší ostrov Středozemního moře. Patří Itálii.'},
+ {id:'sicilie',name:'Sicílie',cat:'ostrovy',kind:'island',part:['ITA',[12,36.5,15.8,38.4]],pt:[14.1,37.5],fact:'Největší ostrov Středozemního moře. Stojí na něm sopka Etna.'},
+ {id:'kreta',name:'Kréta',cat:'ostrovy',kind:'island',part:['GRC',[23.4,34.8,26.4,35.8]],pt:[24.9,35.25],fact:'Největší řecký ostrov. Před 4 000 lety tu vznikla minojská civilizace.'},
+ {id:'santorini',name:'Santorini',cat:'ostrovy',kind:'island',pt:[25.43,36.40],fact:'Sopečný ostrov. Je to zbytek obří sopky, která vybuchla asi před 3 600 lety.'},
+ // krajní body
+ {id:'nordkinn',name:'Mys Nordkinn',cat:'mysy',kind:'cape',pt:[27.65,71.13],sub:'nejsevernější bod',fact:'Nejsevernější bod evropské pevniny, v Norsku. Slavný Nordkapp kousek vedle leží na ostrově, a tak se nepočítá.'},
+ {id:'roca',name:'Mys Roca',cat:'mysy',kind:'cape',pt:[-9.50,38.78],sub:'nejzápadnější bod',fact:'Nejzápadnější bod evropské pevniny, v Portugalsku u Lisabonu.'},
+ {id:'marroqui',name:'Mys Marroquí',cat:'mysy',kind:'cape',pt:[-5.61,36.005],sub:'nejjižnější bod',fact:'Nejjižnější bod evropské pevniny, u španělského města Tarifa. Afrika je odtud vidět.'},
+ {id:'vychodbod',name:'Polární Ural',cat:'mysy',kind:'cape',pt:[66.1,68.2],sub:'nejvýchodnější bod',fact:'Nejvýchodnější bod Evropy leží na severu pohoří Ural, kudy vede hranice s Asií.'}
+];
+const BYID=Object.fromEntries(F.map(f=>[f.id,f]));
+const isPointish=f=>!!f.pt && !f.line && !f.area && !f.geo;
+
+/* ---------- storage ---------- */
+const SKEY='slepa-mapa-evropy-v1';
+let store={m:{},best:{},cats:CATS.map(c=>c.id)};
+try{const s=JSON.parse(localStorage.getItem(SKEY)||'null'); if(s&&s.m) store=Object.assign(store,s);}catch(e){}
+function save(){try{localStorage.setItem(SKEY,JSON.stringify(store));}catch(e){}}
+const mast=id=>store.m[id]||(store.m[id]={b:0,s:0,c:0});
+const starsHTML=b=>'<span class="stars" aria-label="'+b+' ze 3 hvězd">'+'★'.repeat(b)+'<span class="off">'+'★'.repeat(3-b)+'</span></span>';
+
+/* ---------- map ---------- */
+const svg=d3.select('#map');
+const RE=6371;
+const km=(a,b)=>d3.geoDistance(a,b)*RE;
+let W=0,H=0,proj,path,T=d3.zoomIdentity,kmPerBasePx=10;
+let countries=[];
+const defs=svg.append('defs');
+const clipPath=defs.append('clipPath').attr('id','landclip').append('path');
+const zg=svg.append('g');
+const gGrat=zg.append('path').attr('class','grat');
+const gLand=zg.append('g');
+const gLearn=zg.append('g');
+const gHL=zg.append('g');
+const ov=svg.append('g');
+const gOvLearn=ov.append('g');
+const gOv=ov.append('g');
+let ovItems=[];
+const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const zoom=d3.zoom().scaleExtent([0.6,18]).clickDistance(10)
+  .on('zoom',e=>{T=e.transform;zg.attr('transform',T);placeOverlay();});
+svg.call(zoom).on('dblclick.zoom',null);
+
+function densify(coords,closed){
+  const out=[];const n=coords.length;
+  const segs=closed?n:n-1;
+  for(let i=0;i<segs;i++){
+    const a=coords[i],b=coords[(i+1)%n];
+    const steps=Math.max(1,Math.ceil(km(a,b)/12));
+    const ip=d3.geoInterpolate(a,b);
+    for(let s=0;s<steps;s++)out.push(ip(s/steps));
+  }
+  if(!closed)out.push(coords[n-1]);
+  return out;
+}
+function prepGeo(){
+  for(const f of F){
+    if(f.line)f.dens=densify(f.line,false);
+    if(f.area)f.dens=densify(f.area,true);
+    if(f.iso||f.part){
+      let polys=[];
+      if(f.iso){for(const c of countries)if(f.iso.includes(c.id)){const g=c.geometry;polys=polys.concat(g.type==='Polygon'?[g.coordinates]:g.coordinates);}}
+      else{
+        const [iso,b]=f.part;const c=countries.find(c=>c.id===iso);
+        if(c){const g=c.geometry;const all=g.type==='Polygon'?[g.coordinates]:g.coordinates;
+          for(const p of all){const ce=d3.geoCentroid({type:'Polygon',coordinates:p});if(ce[0]>=b[0]&&ce[0]<=b[2]&&ce[1]>=b[1]&&ce[1]<=b[3])polys.push(p);}}
+      }
+      if(polys.length){
+        f.geo={type:'MultiPolygon',coordinates:polys};
+        const pts=[];for(const p of polys)for(const r of p){const step=Math.max(1,Math.floor(r.length/400));for(let i=0;i<r.length;i+=step)pts.push(r[i]);}
+        f.dens=pts;
+      }
+    }
+    if(!f.lab)f.lab=f.pt||(f.line?f.line[Math.floor(f.line.length/2)]:null);
+  }
+}
+const lineGen=d3.line().curve(d3.curveCatmullRom.alpha(.5));
+function fit(){
+  const r=svg.node().getBoundingClientRect();W=r.width;H=r.height;
+  if(!W||!H)return;
+  const core=[];for(let lo=-12;lo<=42;lo+=6){core.push([lo,35.5],[lo,71]);}
+  proj=d3.geoConicConformal().parallels([42,64]).rotate([-18,0])
+    .fitExtent([[10,10],[W-10,H-10]],{type:'MultiPoint',coordinates:core});
+  proj.clipExtent([[-W*2,-H*2],[W*3,H*3]]);
+  path=d3.geoPath(proj); if(path.digits)path.digits(1);
+  const c=[W/2,H/2];kmPerBasePx=km(proj.invert(c),proj.invert([c[0]+20,c[1]]))/20;
+  gGrat.attr('d',path(d3.geoGraticule().step([10,10]).extent([[-60,20],[100,85]])()));
+  gLand.selectAll('path').data(countries).join('path').attr('class','country').attr('d',path);
+  clipPath.attr('d',path({type:'FeatureCollection',features:countries}));
+  for(const f of F){
+    if(f.line){f.P=f.line.map(proj);f.d=lineGen(f.P);}
+    if(f.area){f.P=f.area.map(proj);f.d='M'+f.P.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join('L')+'Z';}
+    if(f.geo){f.d=path(f.geo);}
+    f.b=boundsOf(f);
+  }
+  redraw();
+}
+function boundsOf(f){
+  if(f.geo){const b=path.bounds(f.geo);return padB(b,f.kind==='island'||f.kind==='islands'?0.6:0.2,f);}
+  if(f.P){const xs=f.P.map(p=>p[0]),ys=f.P.map(p=>p[1]);return padB([[Math.min(...xs),Math.min(...ys)],[Math.max(...xs),Math.max(...ys)]],0.25,f);}
+  const a=proj([f.pt[0]-4,f.pt[1]-2.5]),b=proj([f.pt[0]+4,f.pt[1]+2.5]),c=proj(f.pt);
+  const dx=Math.abs(b[0]-a[0])/2,dy=Math.abs(b[1]-a[1])/2;
+  return [[c[0]-dx,c[1]-dy],[c[0]+dx,c[1]+dy]];
+}
+function padB(b,p){const dx=(b[1][0]-b[0][0])*p,dy=(b[1][1]-b[0][1])*p;const m=Math.max(dx,dy,30);return [[b[0][0]-m,b[0][1]-m],[b[1][0]+m,b[1][1]+m]];}
+function unionB(a,b){return [[Math.min(a[0][0],b[0][0]),Math.min(a[0][1],b[0][1])],[Math.max(a[1][0],b[1][0]),Math.max(a[1][1],b[1][1])]];}
+function zoomTo(b,maxK=6,dur=750){
+  const dx=b[1][0]-b[0][0],dy=b[1][1]-b[0][1];
+  const k=Math.max(0.8,Math.min(maxK,0.9/Math.max(dx/W,dy/H)));
+  const x=(b[0][0]+b[1][0])/2,y=(b[0][1]+b[1][1])/2;
+  const t=d3.zoomIdentity.translate(W/2-k*x,H/2-k*y).scale(k);
+  svg.transition().duration(reduceMotion?0:dur).call(zoom.transform,t);
+}
+function zoomHome(){svg.transition().duration(reduceMotion?0:600).call(zoom.transform,d3.zoomIdentity);}
+d3.select('#zIn').on('click',()=>svg.transition().duration(250).call(zoom.scaleBy,1.6));
+d3.select('#zOut').on('click',()=>svg.transition().duration(250).call(zoom.scaleBy,1/1.6));
+d3.select('#zReset').on('click',zoomHome);
+
+/* overlay (pins, labels) stays crisp at any zoom */
+function placeOverlay(){
+  for(const it of ovItems){
+    if(it.seg){const a=sp(it.seg[0]),b=sp(it.seg[1]);it.el.attr('x1',a[0]).attr('y1',a[1]).attr('x2',b[0]).attr('y2',b[1]);}
+    else{const p=sp(it.ll);it.el.attr('transform','translate('+p[0].toFixed(1)+','+p[1].toFixed(1)+')');}
+  }
+}
+const sp=ll=>{const p=proj(ll);return [T.applyX(p[0]),T.applyY(p[1])];};
+function addPin(layer,ll,color,ring){
+  const g=layer.append('g');
+  if(ring)g.append('circle').attr('class','pt-ring').attr('r',9).attr('stroke',color);
+  g.append('circle').attr('class','pt-dot').attr('r',ring?7:5.5).attr('fill',color);
+  ovItems.push({ll,el:g});return g;
+}
+function addLabel(layer,ll,text,cls,dy){
+  const t=layer.append('text').attr('class','lbl '+(cls||'')).attr('text-anchor','middle').attr('dy',dy||-10).text(text);
+  ovItems.push({ll,el:t});return t;
+}
+function clearOv(layer){layer.selectAll('*').remove();const live=new Set(ov.selectAll('*').nodes());ovItems=ovItems.filter(it=>live.has(it.el.node()));}
+function clearMarks(){gHL.selectAll('*').remove();clearOv(gOv);}
+
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+function drawFeature(f,state){ // state: q | ok | bad
+  const col=css(state==='ok'?'--ok':state==='bad'?'--bad':'--accent');
+  if(f.line)gHL.append('path').attr('class','f-line '+state).attr('d',f.d);
+  else if(f.area)gHL.append('path').attr('class','f-area '+state).attr('d',f.d).attr('clip-path','url(#landclip)');
+  else if(f.geo){gHL.append('path').attr('class','f-land '+state).attr('d',f.d);
+    if(['baleary','korsika','kreta','sardinie'].includes(f.id))addPin(gOv,f.pt,col,true).select('.pt-dot').attr('r',0);}
+  else addPin(gOv,f.pt,col,true);
+  placeOverlay();
+}
+
+/* ---------- hit testing ---------- */
+function pip(p,poly){let ins=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const [xi,yi]=poly[i],[xj,yj]=poly[j];if(((yi>p[1])!==(yj>p[1]))&&(p[0]<(xj-xi)*(p[1]-yi)/(yj-yi)+xi))ins=!ins;}return ins;}
+function measure(f,ll){
+  if(f.area&&pip(proj(ll),f.P))return {d:0};
+  if(f.geo&&d3.geoContains(f.geo,ll))return {d:0};
+  if(!f.dens)return {d:km(ll,f.pt),at:f.pt};
+  let best=Infinity,at=null;for(const q of f.dens){const d=km(ll,q);if(d<best){best=d;at=q;}}
+  return {d:best,at};
+}
+function tolerance(f){
+  const kpp=kmPerBasePx/T.k;const cl=(v,a,b)=>Math.max(a,Math.min(b,v));
+  let ok;
+  if(f.line)ok=cl(22*kpp,60,150);
+  else if(f.area||f.geo)ok=cl(14*kpp,25,90);
+  else ok=cl(24*kpp,45,130);
+  return {ok,near:ok+Math.max(130,ok)};
+}
+
+/* ---------- app state ---------- */
+const S={mode:'home',round:null,learnSel:null,blitz:null};
+const panel=document.getElementById('panel');
+const home=document.getElementById('home');
+const activePool=()=>F.filter(f=>store.cats.includes(f.cat));
+function setHUD(on){document.getElementById('stScore').hidden=!on;document.getElementById('stStreak').hidden=!on;}
+function updHUD(){if(!S.round)return;document.getElementById('vScore').textContent=S.round.score;document.getElementById('vStreak').textContent=S.round.streak;}
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function pickWeighted(pool,n){
+  const w=f=>[8,4,2,1][mast(f.id).b]||1;const left=pool.slice();const out=[];
+  while(out.length<n&&left.length){const tot=left.reduce((s,f)=>s+w(f),0);let r=Math.random()*tot;let i=0;for(;i<left.length;i++){r-=w(left[i]);if(r<=0)break;}out.push(left.splice(Math.min(i,left.length-1),1)[0]);}
+  return out;
+}
+function record(f,res){const m=mast(f.id);m.s++;if(res==='ok'){m.c++;m.b=Math.min(3,m.b+1);}else if(res==='bad'){m.b=0;}save();}
+const kindOf=f=>f.sub?f.sub:KIND[f.kind];
+const round10=d=>Math.max(10,Math.round(d/10)*10);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ---------- HOME ---------- */
+const ICON={
+ learn:'<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M4 8l8-3 8 3 8-3v19l-8 3-8-3-8 3z"/><path d="M12 5v19M20 8v19"/></svg>',
+ find:'<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="16" cy="16" r="11"/><circle cx="16" cy="16" r="5.5"/><circle cx="16" cy="16" r="1.5" fill="currentColor"/></svg>',
+ what:'<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M11.5 11.5a4.5 4.5 0 1 1 6.2 4.2c-1.1.5-1.7 1.4-1.7 2.6v1.2"/><circle cx="16" cy="24.5" r="1.4" fill="currentColor" stroke="none"/><rect x="4" y="4" width="24" height="24" rx="7"/></svg>',
+ blitz:'<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M18 3L7 18h8l-2 11 12-16h-8z"/></svg>'
+};
+function showHome(){
+  stopBlitz();S.mode='home';S.round=null;setHUD(false);clearMarks();clearLearn();
+  const tot=F.length*3,got=F.reduce((s,f)=>s+mast(f.id).b,0);
+  const mastered=F.filter(f=>mast(f.id).b===3).length;
+  const best=k=>store.best[k]?('Rekord: '+store.best[k]):'Zatím bez rekordu';
+  document.getElementById('sheet').innerHTML=`
+   <div><h1>Slepá mapa <span>Evropy</span></h1>
+   <p class="lead">Pohoří, nížiny, poloostrovy, ostrovy a krajní body. Za každou správnou odpověď dostaneš hvězdu, co ti nejde, přijde na řadu častěji.</p></div>
+   <div class="bigprog"><div class="track"><i style="width:${Math.round(got/tot*100)}%"></i></div>
+     <div class="l"><span>Zvládnuto ${mastered} z ${F.length} míst</span><span class="num">${got} / ${tot} ★</span></div></div>
+   <div><h2>Co chceš dělat</h2><div class="modes">
+     <button class="mode" data-m="learn">${ICON.learn}<b>Učit se</b><span>Prohlížej mapu a ťukej na místa.</span></button>
+     <button class="mode" data-m="find">${ICON.find}<b>Najdi na mapě</b><span>Řeknu jméno, ty ťukneš na správné místo.</span><small>${best('find')}</small></button>
+     <button class="mode" data-m="what">${ICON.what}<b>Co je to?</b><span>Ukážu místo, vyber správné jméno.</span><small>${best('what')}</small></button>
+     <button class="mode" data-m="blitz">${ICON.blitz}<b>Bleskovka</b><span>Kolik toho poznáš za 60 sekund?</span><small>${best('blitz')}</small></button>
+   </div></div>
+   <div><h2>Co procvičovat</h2><div class="chips" id="catChips">${CATS.map(c=>`<button class="chip" aria-pressed="${store.cats.includes(c.id)}" data-c="${c.id}">${c.name}</button>`).join('')}</div></div>
+   <details><summary class="linkbtn" style="cursor:pointer">Přehled všech míst</summary><div class="overview">${CATS.map(c=>`<div class="cat">${c.name}</div>`+F.filter(f=>f.cat===c.id).map(f=>`<span>${esc(f.name)}</span>${starsHTML(mast(f.id).b)}`).join('')).join('')}</div>
+   <p style="margin:14px 0 0"><button class="linkbtn" id="resetBtn">Smazat pokrok</button></p></details>`;
+  home.hidden=false;
+  home.querySelectorAll('.mode').forEach(b=>b.onclick=()=>startMode(b.dataset.m));
+  home.querySelectorAll('#catChips .chip').forEach(b=>b.onclick=()=>{
+    const c=b.dataset.c;const on=store.cats.includes(c);
+    if(on&&store.cats.length===1)return;
+    store.cats=on?store.cats.filter(x=>x!==c):store.cats.concat(c);save();b.setAttribute('aria-pressed',!on);
+  });
+  const rb=document.getElementById('resetBtn');
+  rb.onclick=()=>{if(rb.dataset.arm){store.m={};store.best={};save();showHome();}else{rb.dataset.arm=1;rb.textContent='Opravdu smazat? Ťukni znovu';}};
+  panel.innerHTML=`<p class="hint">Vyber v menu, co chceš dělat.</p><button class="btn" id="openMenu">Otevřít menu</button>`;
+  document.getElementById('openMenu').onclick=showHome;
+  zoomHome();
+}
+function startMode(m){
+  home.hidden=true;clearMarks();clearLearn();
+  if(m==='learn')startLearn();
+  else if(m==='blitz')startBlitz();
+  else startRound(m);
+}
+
+/* ---------- LEARN ---------- */
+function clearLearn(){gLearn.selectAll('*').remove();clearOv(gOvLearn);S.learnSel=null;}
+function startLearn(){
+  S.mode='learn';setHUD(false);clearLearn();
+  const pool=activePool();
+  for(const f of pool){
+    const cls=f.kind==='lowland'?'low':'pen';
+    if(f.line)f.el=gLearn.append('path').attr('class','f-line learn').attr('d',f.d);
+    else if(f.area)f.el=gLearn.append('path').attr('class','f-area learn '+cls).attr('d',f.d).attr('clip-path','url(#landclip)');
+    else if(f.geo)f.el=gLearn.append('path').attr('class','f-land learn').attr('d',f.d);
+    else f.el=null;
+  }
+  for(const f of pool){
+    if(isPointish(f))addPin(gOvLearn,f.pt,css(f.kind==='volcano'?'--bad':f.kind==='cape'?'--isl':'--range'),false);
+    f.lblEl=addLabel(gOvLearn,f.lab,f.name,'',isPointish(f)?-10:4);
+  }
+  placeOverlay();renderLearn();
+}
+function renderLearn(){
+  const pool=activePool();const f=S.learnSel?BYID[S.learnSel]:null;
+  panel.innerHTML=(f?`<div class="info"><div class="eyebrow">${esc(kindOf(f))}</div><h3>${esc(f.name)}</h3>
+     <div class="meta">${f.h?`<span class="kind num">${f.h}</span>`:''}${starsHTML(mast(f.id).b)}</div><p>${esc(f.fact)}</p></div>`
+   :`<div><div class="eyebrow">Učení</div><p class="hint" style="margin:4px 0 0">Ťukni na místo na mapě nebo na jméno dole. Mapu můžeš přibližovat dvěma prsty.</p></div>`)
+   +`<div class="chips">${pool.map(x=>`<button class="chip ${x.id===S.learnSel?'sel':''}" data-id="${x.id}">${esc(x.name)}</button>`).join('')}</div>`;
+  panel.querySelectorAll('.chip').forEach(b=>b.onclick=()=>selectLearn(b.dataset.id,true));
+}
+function selectLearn(id,zoomIt){
+  S.learnSel=id;const f=BYID[id];
+  for(const x of F){if(x.el)x.el.classed('f-sel',x.id===id);if(x.lblEl)x.lblEl.classed('sel',x.id===id);}
+  clearOv(gOv);if(isPointish(f))addPin(gOv,f.pt,css('--accent'),true);placeOverlay();
+  if(zoomIt)zoomTo(f.b,isPointish(f)?5:6);
+  renderLearn();panel.scrollTop=0;
+}
+
+/* ---------- ROUNDS: find / what ---------- */
+function startRound(mode){
+  const pool=activePool();
+  S.mode=mode;S.round={mode,items:pickWeighted(pool,Math.min(10,pool.length)),i:0,score:0,streak:0,res:[],answered:false};
+  setHUD(true);updHUD();nextQ();
+}
+function progHTML(){const r=S.round;return '<div class="prog">'+r.items.map((_,i)=>`<i class="${r.res[i]||(i===r.i?'cur':'')}"></i>`).join('')+'</div>';}
+function nextQ(){
+  const r=S.round;clearMarks();
+  if(r.i>=r.items.length)return summary();
+  r.answered=false;const f=r.items[r.i];
+  if(r.mode==='find'){
+    zoomHome();
+    panel.innerHTML=`${progHTML()}<div><div class="eyebrow">Najdi na mapě · ${esc(kindOf(f))}</div><div class="qname">${esc(f.name)}</div></div>
+      <p class="hint">Ťukni na mapu tam, kde to leží. Malá místa najdeš líp, když si mapu přiblížíš.</p>`;
+  }else{
+    drawFeature(f,'q');zoomTo(context(f),5);
+    const opts=makeOptions(f);
+    panel.innerHTML=`${progHTML()}<div class="eyebrow">Co je zvýrazněno na mapě?</div><div class="opts">${opts.map(o=>`<button class="opt" data-id="${o.id}">${esc(o.name)}</button>`).join('')}</div><div id="fbx"></div>`;
+    panel.querySelectorAll('.opt').forEach(b=>b.onclick=()=>answerWhat(b));
+  }
+}
+function context(f){ // show the feature with some surroundings
+  const b=f.b;const c=[(b[0][0]+b[1][0])/2,(b[0][1]+b[1][1])/2];
+  const minW=W*0.55,minH=H*0.55;
+  const w=Math.max(b[1][0]-b[0][0],minW),h=Math.max(b[1][1]-b[0][1],minH);
+  return [[c[0]-w/2,c[1]-h/2],[c[0]+w/2,c[1]+h/2]];
+}
+function makeOptions(f){
+  const same=shuffle(F.filter(x=>x.id!==f.id&&x.cat===f.cat));
+  const other=shuffle(F.filter(x=>x.id!==f.id&&x.cat!==f.cat));
+  return shuffle([f].concat(same.concat(other).slice(0,3)));
+}
+function answerWhat(btn){
+  const r=S.round;if(r.answered)return;r.answered=true;
+  const f=r.items[r.i];const ok=btn.dataset.id===f.id;
+  panel.querySelectorAll('.opt').forEach(b=>{b.disabled=true;if(b.dataset.id===f.id)b.classList.add('ok');});
+  if(!ok)btn.classList.add('bad');
+  gHL.selectAll('path').classed('q',false).classed(ok?'ok':'bad',true);
+  score(ok?'ok':'bad');record(f,ok?'ok':'bad');
+  const fb=document.getElementById('fbx');
+  fb.innerHTML=`<div class="fb ${ok?'ok':'bad'}"><strong>${ok?praise():'Tohle je '+esc(f.name)}</strong><p>${esc(f.fact)}</p></div>
+    <div class="row" style="margin-top:10px"><button class="btn" id="nextB">${r.i+1<r.items.length?'Další':'Výsledky'}</button></div>`;
+  document.getElementById('nextB').onclick=()=>{r.i++;nextQ();};
+  document.getElementById('nextB').focus({preventScroll:true});
+}
+function score(res){
+  const r=S.round;r.res[r.i]=res;
+  if(res==='ok'){r.streak++;r.score+=10+(r.streak>=3?5:0);}
+  else if(res==='near'){r.score+=4;r.streak=0;}
+  else r.streak=0;
+  updHUD();
+}
+const PRAISE=['Správně!','Výborně!','Přesně tak!','Paráda!','Trefa!','Super!'];
+const praise=()=>PRAISE[Math.floor(Math.random()*PRAISE.length)];
+
+svg.on('click',ev=>{
+  if(!proj)return;
+  const [px,py]=d3.pointer(ev,svg.node());const ll=proj.invert(T.invert([px,py]));
+  if(!ll||isNaN(ll[0]))return;
+  if(S.mode==='find'&&S.round&&!S.round.answered)answerFind(ll);
+  else if(S.mode==='learn')learnTap(ll);
+});
+function learnTap(ll){
+  let best=null,bs=Infinity;
+  for(const f of activePool()){const m=measure(f,ll);const t=tolerance(f);const s=m.d/t.near;if(s<bs&&m.d<=t.near){bs=s;best=f;}}
+  if(best)selectLearn(best.id,false);
+}
+function answerFind(ll){
+  const r=S.round;r.answered=true;const f=r.items[r.i];
+  const m=measure(f,ll);const t=tolerance(f);
+  const res=m.d<=t.ok?'ok':m.d<=t.near?'near':'bad';
+  const tapG=gOv.append('circle').attr('class','tap').attr('r',5);ovItems.push({ll,el:tapG});
+  if(res!=='ok'&&m.at){const ln=gOv.insert('line',':first-child').attr('class','miss-line');ovItems.push({seg:[ll,m.at],el:ln});}
+  drawFeature(f,res==='bad'?'bad':'ok');
+  const tb=proj(ll),pad=40;
+  zoomTo(unionB(context(f),[[tb[0]-pad,tb[1]-pad],[tb[0]+pad,tb[1]+pad]]),4);
+  score(res);record(f,res);
+  const dist=round10(m.d);
+  const head=res==='ok'?praise():res==='near'?'Skoro!':'Vedle';
+  const msg=res==='ok'?esc(f.fact):res==='near'?`Byl jsi asi ${dist} km od místa. Na mapě je teď vidět přesně. ${esc(f.fact)}`:`${esc(f.name)} je zvýrazněno na mapě. Byl jsi asi ${dist} km daleko.`;
+  panel.innerHTML=`${progHTML()}<div><div class="eyebrow">${esc(kindOf(f))}</div><div class="qname">${esc(f.name)}</div></div>
+   <div class="fb ${res}"><strong>${head}${res==='ok'?' +'+(10+(r.streak>=3?5:0)):res==='near'?' +4':''}</strong><p>${msg}</p></div>
+   <div class="row"><button class="btn" id="nextB">${r.i+1<r.items.length?'Další':'Výsledky'}</button></div>`;
+  document.getElementById('nextB').onclick=()=>{r.i++;nextQ();};
+}
+function summary(){
+  const r=S.round;S.mode='summary';clearMarks();zoomHome();
+  const okN=r.res.filter(x=>x==='ok').length;
+  const key=r.mode;const rec=!store.best[key]||r.score>store.best[key];
+  if(rec){store.best[key]=r.score;save();}
+  const miss=r.items.filter((f,i)=>r.res[i]!=='ok');
+  panel.innerHTML=`<div><div class="eyebrow">Kolo hotové</div><div class="qname num">${r.score} bodů</div>
+   <p class="hint" style="margin:6px 0 0">Správně ${okN} z ${r.items.length}.${rec?' <b style="color:var(--accent)">Nový rekord!</b>':' Rekord je '+store.best[key]+' bodů.'}</p></div>
+   ${miss.length?`<div><div class="eyebrow" style="margin-bottom:6px">Ještě procvič</div><div class="chips">${miss.map(f=>`<span class="chip">${esc(f.name)}</span>`).join('')}</div></div>`:'<p class="hint">Všechno správně, jsi zeměpisec!</p>'}
+   <div class="row"><button class="btn" id="again">Hrát znovu</button><button class="btn ghost" id="menu">Menu</button></div>`;
+  document.getElementById('again').onclick=()=>startRound(r.mode);
+  document.getElementById('menu').onclick=showHome;
+}
+
+/* ---------- BLITZ ---------- */
+function startBlitz(){
+  S.mode='blitz';S.round={mode:'blitz',score:0,streak:0,i:0,res:[],items:[]};setHUD(true);updHUD();
+  S.blitz={end:Date.now()+60000,timer:setInterval(tickBlitz,250),last:null};blitzQ();
+}
+function stopBlitz(){if(S.blitz){clearInterval(S.blitz.timer);S.blitz=null;}}
+function tickBlitz(){
+  const left=Math.max(0,S.blitz.end-Date.now());const bar=document.getElementById('tbar');
+  if(bar)bar.style.transform='scaleX('+(left/60000)+')';
+  const lt=document.getElementById('tleft');if(lt)lt.textContent=Math.ceil(left/1000)+' s';
+  if(left<=0)endBlitz();
+}
+function blitzQ(){
+  if(!S.blitz)return;clearMarks();
+  const pool=activePool().filter(f=>f.id!==S.blitz.last);
+  const f=pickWeighted(pool,1)[0];S.blitz.last=f.id;S.blitz.cur=f;S.round.answered=false;
+  drawFeature(f,'q');zoomTo(context(f),4,450);
+  const opts=makeOptions(f);
+  panel.innerHTML=`<div class="qline"><div class="eyebrow">Bleskovka · co je to?</div><b class="num" id="tleft">${Math.ceil((S.blitz.end-Date.now())/1000)} s</b></div>
+   <div class="timer"><i id="tbar" style="transform:scaleX(${(S.blitz.end-Date.now())/60000})"></i></div>
+   <div class="opts">${opts.map(o=>`<button class="opt" data-id="${o.id}">${esc(o.name)}</button>`).join('')}</div>`;
+  panel.querySelectorAll('.opt').forEach(b=>b.onclick=()=>{
+    if(S.round.answered||!S.blitz)return;S.round.answered=true;
+    const ok=b.dataset.id===f.id;
+    panel.querySelectorAll('.opt').forEach(x=>{x.disabled=true;if(x.dataset.id===f.id)x.classList.add('ok');});
+    if(!ok)b.classList.add('bad');
+    gHL.selectAll('path').classed('q',false).classed(ok?'ok':'bad',true);
+    S.round.score+=ok?1:0;S.round.streak=ok?S.round.streak+1:0;updHUD();record(f,ok?'ok':'bad');
+    setTimeout(blitzQ,ok?450:1300);
+  });
+}
+function endBlitz(){
+  const sc=S.round.score;stopBlitz();S.mode='summary';clearMarks();zoomHome();
+  const rec=!store.best.blitz||sc>store.best.blitz;if(rec){store.best.blitz=sc;save();}
+  panel.innerHTML=`<div><div class="eyebrow">Čas vypršel</div><div class="qname num">${sc} ${sc===1?'místo':sc>=2&&sc<=4?'místa':'míst'}</div>
+   <p class="hint" style="margin:6px 0 0">${rec?'<b style="color:var(--accent)">Nový rekord!</b>':'Rekord je '+store.best.blitz+'.'}</p></div>
+   <div class="row"><button class="btn" id="again">Znovu</button><button class="btn ghost" id="menu">Menu</button></div>`;
+  document.getElementById('again').onclick=startBlitz;
+  document.getElementById('menu').onclick=showHome;
+}
+
+/* ---------- boot ---------- */
+document.getElementById('homeBtn').onclick=showHome;
+document.getElementById('brand').onclick=showHome;
+function boot(){
+  let topo=null;
+  try{topo=window.Datamap&&window.Datamap.prototype.worldTopo;}catch(e){}
+  if(!topo||typeof topo!=='object'||!window.topojson){document.getElementById('loading').textContent='Mapu se nepodařilo načíst. Zkontroluj připojení k internetu a obnov stránku.';return;}
+  const key=Object.keys(topo.objects)[0];
+  countries=topojson.feature(topo,topo.objects[key]).features.filter(f=>{
+    if(!f.geometry)return false;if(f.id==='RUS')return true;
+    const b=d3.geoBounds(f);if(b[0][0]>b[1][0])return false;
+    return b[1][0]>-35&&b[0][0]<75&&b[1][1]>25&&b[0][1]<82;
+  });
+  prepGeo();fit();document.getElementById('loading').hidden=true;
+  new ResizeObserver(()=>{const r=svg.node().getBoundingClientRect();if(Math.abs(r.width-W)>2||Math.abs(r.height-H)>2)fit();}).observe(svg.node());
+  showHome();
+}
+function redraw(){
+  // re-render current highlights after a refit
+  if(S.mode==='learn'){const sel=S.learnSel;startLearn();if(sel)selectLearn(sel,false);}
+  else if((S.mode==='what'||S.mode==='find')&&S.round&&!S.round.answered){nextQ();}
+  else placeOverlay();
+}
+boot();
+</script>
+
+</body>
+</html>
